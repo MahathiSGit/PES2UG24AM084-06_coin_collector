@@ -22,6 +22,17 @@ class GameEngine:
         self.coins = [self._random_coin() for _ in range(NUM_COINS)]
         self.score = 0
 
+        self.lives = 3
+
+        self.obstacles = [
+            pygame.Rect(100, 100, 100, 30),
+            pygame.Rect(450, 150, 30, 120),
+            pygame.Rect(250, 350, 120, 30),
+        ]
+
+        self.was_colliding = False
+        
+
     def _random_coin(self):
         x = random.randint(30, WIDTH - 30)
         y = random.randint(30, HEIGHT - 30)
@@ -54,7 +65,37 @@ class GameEngine:
             self.score += coin.value
             self.coins.remove(coin)
 
+        player_rect = self.player.get_rect()
+
+        currently_colliding = any(
+            player_rect.colliderect(obstacle)
+            for obstacle in self.obstacles
+        )
+
+        if currently_colliding and not self.was_colliding:
+            self.lives -= 1
+
+        self.was_colliding = currently_colliding
+
     def draw(self, surface, font):
         from game import renderer
-        renderer.draw_scene(surface, self.player, self.coins)
-        renderer.draw_text(surface, font, f"Score: {self.score}", (10, 10))
+        renderer.draw_scene(
+            surface,
+            self.player,
+            self.coins,
+            self.obstacles,
+        )
+
+        renderer.draw_text(
+            surface,
+            font,
+            f"Score: {self.score}",
+            (10, 10),
+        )
+
+        renderer.draw_text(
+            surface,
+            font,
+            f"Lives: {self.lives}",
+            (10, 40),
+        )
