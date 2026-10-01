@@ -5,6 +5,7 @@ from game.player import Player
 from game.coin import Coin
 from game.collection import check_collection
 from game.renderer import WIDTH, HEIGHT
+from game import renderer
 
 
 NUM_COINS = 6
@@ -14,6 +15,7 @@ COIN_TYPES = [
     (3, (192, 192, 192)),  # Silver
     (5, (255, 215, 0)),    # Gold
 ]
+ROUND_DURATION = 30
 
 
 class GameEngine:
@@ -31,6 +33,9 @@ class GameEngine:
         ]
 
         self.was_colliding = False
+        self.round_start_time = pygame.time.get_ticks()
+        self.remaining_time = ROUND_DURATION
+        self.round_active = True
         
 
     def _random_coin(self):
@@ -47,20 +52,39 @@ class GameEngine:
             color=color,
         )
 
-    def handle_input(self, keys_pressed):
-        dx = dy = 0
-        if keys_pressed[pygame.K_UP]:
-            dy -= self.player.speed
-        if keys_pressed[pygame.K_DOWN]:
-            dy += self.player.speed
-        if keys_pressed[pygame.K_LEFT]:
-            dx -= self.player.speed
-        if keys_pressed[pygame.K_RIGHT]:
-            dx += self.player.speed
+    def handle_input(self, keys):
+        if not self.round_active:
+            if keys[pygame.K_r]:
+                self.reset_round()
+            return
+
+        dx = 0
+        dy = 0
+
+        if keys[pygame.K_LEFT]:
+            dx -= 1
+        if keys[pygame.K_RIGHT]:
+            dx += 1
+        if keys[pygame.K_UP]:
+            dy -= 1
+        if keys[pygame.K_DOWN]:
+            dy += 1
+
         self.player.move(dx, dy, WIDTH, HEIGHT)
 
     def update(self):
+        if not self.round_active:
+            return
+
+        elapsed = (pygame.time.get_ticks() - self.round_start_time) / 1000
+        self.remaining_time = max(0, ROUND_DURATION - elapsed)
+
+        if self.remaining_time <= 0:
+            self.round_active = False
+            return
+
         collected = check_collection(self.player, self.coins)
+
         for coin in collected:
             self.score += coin.value
             self.coins.remove(coin)
@@ -77,25 +101,71 @@ class GameEngine:
 
         self.was_colliding = currently_colliding
 
+        if self.lives <= 0:
+            self.round_active = False
+
     def draw(self, surface, font):
-        from game import renderer
         renderer.draw_scene(
             surface,
             self.player,
             self.coins,
-            self.obstacles,
+            self.obstacles
         )
 
         renderer.draw_text(
             surface,
             font,
             f"Score: {self.score}",
-            (10, 10),
+            (10, 10)
         )
 
         renderer.draw_text(
             surface,
             font,
             f"Lives: {self.lives}",
-            (10, 40),
+            (10, 40)
         )
+
+        renderer.draw_text(
+            surface,
+            font,
+            f"Time: {int(self.remaining_time)}",
+            (10, 70)
+        )
+
+        if not self.round_active:
+            renderer.draw_banner(
+                surface,
+                font,
+                f"GAME OVER - Final Score: {self.score} - Press R to Restart"
+            )
+
+        renderer.draw_text(
+            surface,
+            font,
+            f"Time: {int(self.remaining_time)}",
+            (10, 70)
+        )
+
+        if not self.round_active:
+            renderer.draw_banner(
+                surface,
+                font,
+                f"GAME OVER - Final Score: {self.score} - Press R to Restart"
+            )
+    def reset_round(self):
+        self.player = Player(WIDTH // 2, HEIGHT // 2)
+
+        self.coins = [
+            self._random_coin()
+            for _ in range(NUM_COINS)
+        ]
+
+        self.score = 0
+        self.lives = 3
+
+        self.was_colliding = False
+
+        self.round_start_time = pygame.time.get_ticks()
+        self.remaining_time = ROUND_DURATION
+        self.round_active = True
